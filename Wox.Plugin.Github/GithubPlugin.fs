@@ -17,12 +17,23 @@ type GithubPlugin() =
             return result
         }
     
+    let getUsers (u:string) =
+        async {
+            let task = client.Search.SearchUsers(new SearchUsersRequest(u))
+            let! result = Async.AwaitTask task
+            return result
+        }
+
     member this.ProcessQuery x =
         match x with
         | ["repos"; search] ->
             let result  = Async.RunSynchronously (getRepositories search)
             result.Items
                 |> Seq.map (fun r -> r.FullName, r.Description )
+        | ["users"; search] ->
+            let result = Async.RunSynchronously (getUsers search)
+            result.Items
+                |> Seq.map (fun u -> u.Login, u.HtmlUrl)
         | _ ->
             Seq.empty
 
