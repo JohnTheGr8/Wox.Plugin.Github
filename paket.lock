@@ -1,0 +1,6 @@
+FRAMEWORK: >= NET452
+NUGET
+  remote: https://www.nuget.org/api/v2
+    Octokit (0.24)
+    System.ValueTuple (4.3)
+    Wox.Plugin (1.3.159)
