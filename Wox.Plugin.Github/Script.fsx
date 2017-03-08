@@ -5,4 +5,12 @@
 #r "Wox.Plugin.dll"
 
 #load "GithubPlugin.fs"
+open Wox.Plugin
 open Wox.Plugin.Github
+
+let printResult res =
+    printfn "Title: \t\t %s \nSubTitle: \t %s " <|| res
+
+let plugin = new GithubPlugin()
+
+Seq.iter printResult <| plugin.ProcessQuery [ "repos"; "wox" ]
