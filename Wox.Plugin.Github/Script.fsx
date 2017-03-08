@@ -16,3 +16,5 @@ let plugin = new GithubPlugin()
 Seq.iter printResult <| plugin.ProcessQuery [ "repos"; "wox" ]
 
 Seq.iter printResult <| plugin.ProcessQuery [ "users"; "john" ]
+
+Seq.iter printResult <| plugin.ProcessQuery [ "pr"; "wox-launcher/wox" ]
