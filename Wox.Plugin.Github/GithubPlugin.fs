@@ -39,6 +39,13 @@ type GithubPlugin() =
             return result
         }
 
+    let getRepo (u:string) (r:string) =
+        async {
+            let task = client.Repository.Get(u,r)
+            let! result = Async.AwaitTask task
+            return result
+        }
+
     member this.ProcessQuery x =
         match x with
         | ["repos"; search] ->
@@ -59,6 +66,17 @@ type GithubPlugin() =
             res
                 |> Seq.filter (fun i -> not (isNull i.PullRequest) )
                 |> Seq.map (fun i -> i.Title, i.User.Login )
+        | ["repo"; UserRepoFormat(u, r)] ->
+            let res  = Async.RunSynchronously (getRepo u r)
+            let issues = Async.RunSynchronously (getIssues u r)
+
+            let issueCount,prCount = issues |> Seq.fold (fun (i,pr) x -> if isNull x.PullRequest then (i+1,pr) else (i,pr+1)) (0, 0)
+
+            seq [
+                res.FullName, res.Description;
+                "Issues", (sprintf "%d issues open" issueCount);
+                "Pull Requests", (sprintf "%d pull requests open" prCount);
+            ]
         | _ ->
             Seq.empty
 
