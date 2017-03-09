@@ -4,6 +4,7 @@ open Octokit
 open Wox.Plugin
 open System.Collections.Generic
 open System.Text.RegularExpressions
+open System.Diagnostics
 
 type GithubPlugin() = 
     
@@ -49,23 +50,52 @@ type GithubPlugin() =
     member this.ProcessQuery x =
         match x with
         | ["repos"; search] ->
-            let result  = Async.RunSynchronously (getRepositories search)
+            let result = Async.RunSynchronously (getRepositories search)
+            
             result.Items
-                |> Seq.map (fun r -> r.FullName, r.Description )
+                |> Seq.map (fun r -> 
+                    new Result(
+                        Title = r.FullName,
+                        SubTitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description,
+                        Action = fun _ -> 
+                            PluginContext.API.ChangeQuery <| sprintf "%s repo %s" PluginContext.CurrentPluginMetadata.ActionKeyword r.FullName
+                            false
+                        ))
         | ["users"; search] ->
             let result = Async.RunSynchronously (getUsers search)
             result.Items
-                |> Seq.map (fun u -> u.Login, u.HtmlUrl)
+                |> Seq.map (fun u -> 
+                    new Result(
+                        Title = u.Login,
+                        SubTitle = u.HtmlUrl,
+                        Action = fun _ ->
+                            Process.Start u.HtmlUrl |> ignore
+                            true
+                        ))
         | ["issues"; UserRepoFormat(u,r)] ->
             let res  = Async.RunSynchronously (getIssues u r)
             res
                 |> Seq.filter (fun i -> isNull i.PullRequest)
-                |> Seq.map (fun i -> i.Title, i.User.Login)
+                |> Seq.map (fun i -> 
+                    new Result(
+                        Title = i.Title,
+                        SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
+                        Action = fun _ -> 
+                            Process.Start (i.HtmlUrl.ToString()) |> ignore
+                            true
+                    ))
         | ["pr"; UserRepoFormat(u,r)] ->
             let res  = Async.RunSynchronously (getIssues u r)
             res
                 |> Seq.filter (fun i -> not (isNull i.PullRequest) )
-                |> Seq.map (fun i -> i.Title, i.User.Login )
+                |> Seq.map (fun i -> 
+                    new Result(
+                        Title = i.Title,
+                        SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
+                        Action = fun _ -> 
+                            Process.Start (i.HtmlUrl.ToString()) |> ignore
+                            true
+                    ))
         | ["repo"; UserRepoFormat(u, r)] ->
             let res  = Async.RunSynchronously (getRepo u r)
             let issues = Async.RunSynchronously (getIssues u r)
@@ -73,9 +103,27 @@ type GithubPlugin() =
             let issueCount,prCount = issues |> Seq.fold (fun (i,pr) x -> if isNull x.PullRequest then (i+1,pr) else (i,pr+1)) (0, 0)
 
             seq [
-                res.FullName, res.Description;
-                "Issues", (sprintf "%d issues open" issueCount);
-                "Pull Requests", (sprintf "%d pull requests open" prCount);
+                new Result(
+                    Title = res.FullName, 
+                    SubTitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description,
+                    Action = fun _ -> 
+                        Process.Start res.HtmlUrl |> ignore
+                        true 
+                    );
+                new Result(
+                    Title = "Issues", 
+                    SubTitle = (sprintf "%d issues open" issueCount),
+                    Action = fun _ -> 
+                        PluginContext.API.ChangeQuery <| sprintf "%s issues %s/%s" PluginContext.CurrentPluginMetadata.ActionKeyword u r
+                        false
+                    );
+                new Result(
+                    Title = "Pull Requests", 
+                    SubTitle = (sprintf "%d pull requests open" prCount),
+                    Action = fun _ -> 
+                        PluginContext.API.ChangeQuery <| sprintf "%s pr %s/%s" PluginContext.CurrentPluginMetadata.ActionKeyword u r
+                        false 
+                    );
             ]
         | _ ->
             Seq.empty
@@ -87,7 +135,5 @@ type GithubPlugin() =
         member this.Query (q:Query) =
             let query = List.ofArray q.Terms |> List.skip 1
             
-            this.ProcessQuery query 
-            |> Seq.map (fun (t,s) -> 
-                new Result(Title = t, SubTitle = s) )
+            this.ProcessQuery query
             |> List<Result>

@@ -8,8 +8,8 @@
 open Wox.Plugin
 open Wox.Plugin.Github
 
-let printResult res =
-    printfn "Title: \t\t %s \nSubTitle: \t %s " <|| res
+let printResult (r:Result) =
+    printfn "Title: \t\t %s \nSubTitle: \t %s " r.Title r.SubTitle
 
 let plugin = new GithubPlugin()
 
