@@ -54,6 +54,12 @@
     <Compile Include="GithubPlugin.fs" />
     <None Include="Script.fsx" />
     <Content Include="paket.references" />
+    <None Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

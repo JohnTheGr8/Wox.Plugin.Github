@@ -27,7 +27,7 @@ type GithubPlugin() =
         PluginContext.API.ChangeQuery <| sprintf "%s %s %s" PluginContext.CurrentPluginMetadata.ActionKeyword newQuery newParam
         false
     
-    let limitExceededResult = seq [ new Result(Title = "Rate limit exceeded", SubTitle = "please try again later" ) ]
+    let limitExceededResult = seq [ new Result(Title = "Rate limit exceeded", SubTitle = "please try again later", IcoPath = "icon.png" ) ]
 
     let getRepositories (r:string) = async {
         let task = client.Search.SearchRepo(new SearchRepositoriesRequest(r))
@@ -62,6 +62,7 @@ type GithubPlugin() =
                         new Result(
                             Title = r.FullName,
                             SubTitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description,
+                            IcoPath = "icon.png",
                             Action = fun _ -> changeQuery "repo" r.FullName
                             ))
                 | Choice2Of2 _ -> limitExceededResult
@@ -76,6 +77,7 @@ type GithubPlugin() =
                         new Result(
                             Title = u.Login,
                             SubTitle = u.HtmlUrl,
+                            IcoPath = "icon.png",
                             Action = fun _-> openUrl u.HtmlUrl
                         ))
                 | Choice2Of2 _ -> limitExceededResult
@@ -91,6 +93,7 @@ type GithubPlugin() =
                         new Result(
                             Title = i.Title,
                             SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
+                            IcoPath = "icon.png",
                             Action = fun _-> openUrl (i.HtmlUrl.ToString())
                         ))
                 | Choice2Of2 _ -> limitExceededResult
@@ -106,6 +109,7 @@ type GithubPlugin() =
                         new Result(
                             Title = i.Title,
                             SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
+                            IcoPath = "icon.png",
                             Action = fun _-> openUrl (i.HtmlUrl.ToString())
                         ))
                 | Choice2Of2 _ -> limitExceededResult
@@ -121,22 +125,25 @@ type GithubPlugin() =
                     new Result(
                         Title = res.FullName, 
                         SubTitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description,
+                        IcoPath = "icon.png",
                         Action = fun _-> openUrl res.HtmlUrl
                         );
                     new Result(
                         Title = "Issues", 
                         SubTitle = (sprintf "%d issues open" issueCount),
+                        IcoPath = "icon.png",
                         Action = fun _ -> changeQuery "issues" res.FullName
                         );
                     new Result(
                         Title = "Pull Requests", 
                         SubTitle = (sprintf "%d pull requests open" prCount),
+                        IcoPath = "icon.png",
                         Action = fun _ -> changeQuery "pr" res.FullName
                         );
                 ]
             | _ -> limitExceededResult
         | _ -> 
-            seq [ new Result(Title = "No results found", SubTitle = "please try a different query") ]
+            seq [ new Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
 
     interface IPlugin with
         member this.Init (context:PluginInitContext) = 
