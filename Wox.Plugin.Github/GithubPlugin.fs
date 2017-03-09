@@ -19,6 +19,14 @@ type GithubPlugin() =
             UserRepoFormat(user, group)
         else OtherFormat
 
+    let openUrl (url:string) = 
+        Process.Start url |> ignore
+        true
+
+    let changeQuery (newQuery:string) (newParam:string) =
+        PluginContext.API.ChangeQuery <| sprintf "%s %s %s" PluginContext.CurrentPluginMetadata.ActionKeyword newQuery newParam
+        false
+    
     let getRepositories (r:string) =
         async {
             let task = client.Search.SearchRepo(new SearchRepositoriesRequest(r))
@@ -57,9 +65,7 @@ type GithubPlugin() =
                     new Result(
                         Title = r.FullName,
                         SubTitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description,
-                        Action = fun _ -> 
-                            PluginContext.API.ChangeQuery <| sprintf "%s repo %s" PluginContext.CurrentPluginMetadata.ActionKeyword r.FullName
-                            false
+                        Action = fun _ -> changeQuery "repo" r.FullName
                         ))
         | ["users"; search] ->
             let result = Async.RunSynchronously (getUsers search)
@@ -68,10 +74,8 @@ type GithubPlugin() =
                     new Result(
                         Title = u.Login,
                         SubTitle = u.HtmlUrl,
-                        Action = fun _ ->
-                            Process.Start u.HtmlUrl |> ignore
-                            true
-                        ))
+                        Action = fun _-> openUrl u.HtmlUrl
+                    ))
         | ["issues"; UserRepoFormat(u,r)] ->
             let res  = Async.RunSynchronously (getIssues u r)
             res
@@ -80,9 +84,7 @@ type GithubPlugin() =
                     new Result(
                         Title = i.Title,
                         SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
-                        Action = fun _ -> 
-                            Process.Start (i.HtmlUrl.ToString()) |> ignore
-                            true
+                        Action = fun _-> openUrl (i.HtmlUrl.ToString())
                     ))
         | ["pr"; UserRepoFormat(u,r)] ->
             let res  = Async.RunSynchronously (getIssues u r)
@@ -92,9 +94,7 @@ type GithubPlugin() =
                     new Result(
                         Title = i.Title,
                         SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
-                        Action = fun _ -> 
-                            Process.Start (i.HtmlUrl.ToString()) |> ignore
-                            true
+                        Action = fun _-> openUrl (i.HtmlUrl.ToString())
                     ))
         | ["repo"; UserRepoFormat(u, r)] ->
             let res  = Async.RunSynchronously (getRepo u r)
@@ -106,23 +106,17 @@ type GithubPlugin() =
                 new Result(
                     Title = res.FullName, 
                     SubTitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description,
-                    Action = fun _ -> 
-                        Process.Start res.HtmlUrl |> ignore
-                        true 
+                    Action = fun _-> openUrl res.HtmlUrl
                     );
                 new Result(
                     Title = "Issues", 
                     SubTitle = (sprintf "%d issues open" issueCount),
-                    Action = fun _ -> 
-                        PluginContext.API.ChangeQuery <| sprintf "%s issues %s/%s" PluginContext.CurrentPluginMetadata.ActionKeyword u r
-                        false
+                    Action = fun _ -> changeQuery "issues" res.FullName
                     );
                 new Result(
                     Title = "Pull Requests", 
                     SubTitle = (sprintf "%d pull requests open" prCount),
-                    Action = fun _ -> 
-                        PluginContext.API.ChangeQuery <| sprintf "%s pr %s/%s" PluginContext.CurrentPluginMetadata.ActionKeyword u r
-                        false 
+                    Action = fun _ -> changeQuery "pr" res.FullName
                     );
             ]
         | _ ->
