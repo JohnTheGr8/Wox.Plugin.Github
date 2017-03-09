@@ -27,100 +27,116 @@ type GithubPlugin() =
         PluginContext.API.ChangeQuery <| sprintf "%s %s %s" PluginContext.CurrentPluginMetadata.ActionKeyword newQuery newParam
         false
     
-    let getRepositories (r:string) =
-        async {
-            let task = client.Search.SearchRepo(new SearchRepositoriesRequest(r))
-            let! result = Async.AwaitTask task
-            return result
-        }
-    
-    let getUsers (u:string) =
-        async {
-            let task = client.Search.SearchUsers(new SearchUsersRequest(u))
-            let! result = Async.AwaitTask task
-            return result
-        }
-    
-    let getIssues (u:string) (r:string) =
-        async {
-            let task = client.Issue.GetAllForRepository(u, r)
-            let! result = Async.AwaitTask task
-            return result
-        }
+    let limitExceededResult = seq [ new Result(Title = "Rate limit exceeded", SubTitle = "please try again later" ) ]
 
-    let getRepo (u:string) (r:string) =
-        async {
-            let task = client.Repository.Get(u,r)
-            let! result = Async.AwaitTask task
-            return result
-        }
+    let getRepositories (r:string) = async {
+        let task = client.Search.SearchRepo(new SearchRepositoriesRequest(r))
+        return! Async.AwaitTask task
+    }
+    
+    let getUsers (u:string) = async {
+        let task = client.Search.SearchUsers(new SearchUsersRequest(u))
+        return! Async.AwaitTask task
+    }
+    
+    let getIssues (u:string) (r:string) = async {
+        let task = client.Issue.GetAllForRepository(u, r)
+        return! Async.AwaitTask task
+    }
+
+    let getRepo (u:string) (r:string) = async {
+        let task = client.Repository.Get(u,r)
+        return! Async.AwaitTask task
+    }
 
     member this.ProcessQuery x =
         match x with
         | ["repos"; search] ->
-            let result = Async.RunSynchronously (getRepositories search)
-            
-            result.Items
-                |> Seq.map (fun r -> 
-                    new Result(
-                        Title = r.FullName,
-                        SubTitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description,
-                        Action = fun _ -> changeQuery "repo" r.FullName
-                        ))
+            getRepositories search
+            |> Async.Catch
+            |> Async.RunSynchronously
+            |> function
+                | Choice1Of2 result ->
+                    result.Items
+                    |> Seq.map (fun r -> 
+                        new Result(
+                            Title = r.FullName,
+                            SubTitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description,
+                            Action = fun _ -> changeQuery "repo" r.FullName
+                            ))
+                | Choice2Of2 _ -> limitExceededResult
         | ["users"; search] ->
-            let result = Async.RunSynchronously (getUsers search)
-            result.Items
-                |> Seq.map (fun u -> 
-                    new Result(
-                        Title = u.Login,
-                        SubTitle = u.HtmlUrl,
-                        Action = fun _-> openUrl u.HtmlUrl
-                    ))
+            getUsers search
+            |> Async.Catch
+            |> Async.RunSynchronously
+            |> function
+                | Choice1Of2 result -> 
+                    result.Items
+                    |> Seq.map (fun u -> 
+                        new Result(
+                            Title = u.Login,
+                            SubTitle = u.HtmlUrl,
+                            Action = fun _-> openUrl u.HtmlUrl
+                        ))
+                | Choice2Of2 _ -> limitExceededResult
         | ["issues"; UserRepoFormat(u,r)] ->
-            let res  = Async.RunSynchronously (getIssues u r)
-            res
-                |> Seq.filter (fun i -> isNull i.PullRequest)
-                |> Seq.map (fun i -> 
-                    new Result(
-                        Title = i.Title,
-                        SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
-                        Action = fun _-> openUrl (i.HtmlUrl.ToString())
-                    ))
+            getIssues u r
+            |> Async.Catch
+            |> Async.RunSynchronously
+            |> function
+                | Choice1Of2 result -> 
+                    result
+                    |> Seq.filter (fun i -> isNull i.PullRequest)
+                    |> Seq.map (fun i -> 
+                        new Result(
+                            Title = i.Title,
+                            SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
+                            Action = fun _-> openUrl (i.HtmlUrl.ToString())
+                        ))
+                | Choice2Of2 _ -> limitExceededResult
         | ["pr"; UserRepoFormat(u,r)] ->
-            let res  = Async.RunSynchronously (getIssues u r)
-            res
-                |> Seq.filter (fun i -> not (isNull i.PullRequest) )
-                |> Seq.map (fun i -> 
-                    new Result(
-                        Title = i.Title,
-                        SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
-                        Action = fun _-> openUrl (i.HtmlUrl.ToString())
-                    ))
+            getIssues u r
+            |> Async.Catch
+            |> Async.RunSynchronously
+            |> function
+                | Choice1Of2 result -> 
+                    result
+                    |> Seq.filter (fun i -> not (isNull i.PullRequest) )
+                    |> Seq.map (fun i -> 
+                        new Result(
+                            Title = i.Title,
+                            SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
+                            Action = fun _-> openUrl (i.HtmlUrl.ToString())
+                        ))
+                | Choice2Of2 _ -> limitExceededResult
         | ["repo"; UserRepoFormat(u, r)] ->
-            let res  = Async.RunSynchronously (getRepo u r)
-            let issues = Async.RunSynchronously (getIssues u r)
+            let repoResult = getRepo u r |> Async.Catch |> Async.RunSynchronously
+            let issuesResult = getIssues u r |> Async.Catch |> Async.RunSynchronously
 
-            let issueCount,prCount = issues |> Seq.fold (fun (i,pr) x -> if isNull x.PullRequest then (i+1,pr) else (i,pr+1)) (0, 0)
+            match repoResult, issuesResult with
+            | Choice1Of2 res, Choice1Of2 issues ->
+                let issueCount,prCount = issues |> Seq.fold (fun (i,pr) x -> if isNull x.PullRequest then (i+1,pr) else (i,pr+1)) (0, 0)
 
-            seq [
-                new Result(
-                    Title = res.FullName, 
-                    SubTitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description,
-                    Action = fun _-> openUrl res.HtmlUrl
-                    );
-                new Result(
-                    Title = "Issues", 
-                    SubTitle = (sprintf "%d issues open" issueCount),
-                    Action = fun _ -> changeQuery "issues" res.FullName
-                    );
-                new Result(
-                    Title = "Pull Requests", 
-                    SubTitle = (sprintf "%d pull requests open" prCount),
-                    Action = fun _ -> changeQuery "pr" res.FullName
-                    );
-            ]
-        | _ ->
-            Seq.empty
+                seq [
+                    new Result(
+                        Title = res.FullName, 
+                        SubTitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description,
+                        Action = fun _-> openUrl res.HtmlUrl
+                        );
+                    new Result(
+                        Title = "Issues", 
+                        SubTitle = (sprintf "%d issues open" issueCount),
+                        Action = fun _ -> changeQuery "issues" res.FullName
+                        );
+                    new Result(
+                        Title = "Pull Requests", 
+                        SubTitle = (sprintf "%d pull requests open" prCount),
+                        Action = fun _ -> changeQuery "pr" res.FullName
+                        );
+                ]
+            | _ -> limitExceededResult
+        | _ -> 
+            seq [ new Result(Title = "No results found", SubTitle = "please try a different query") ]
 
     interface IPlugin with
         member this.Init (context:PluginInitContext) = 
