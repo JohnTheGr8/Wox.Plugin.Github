@@ -158,7 +158,20 @@ type GithubPlugin() =
                     );
             ]
         | _ -> 
-            seq [ new Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
+            seq [ 
+                new Result(
+                    Title = "Search repositories",
+                    SubTitle = "Search Github repositories with \"gh repos {repo-search-term}\"",
+                    IcoPath = "icon.png",
+                    Action = fun _ -> changeQuery "repos" ""
+                    );
+                new Result(
+                    Title = "Search users",
+                    SubTitle = "Search Github users with \"gh users {user-search-term}\"",
+                    IcoPath = "icon.png",
+                    Action = fun _ -> changeQuery "users" ""
+                    );
+            ]
 
     interface IPlugin with
         member this.Init (context:PluginInitContext) = 

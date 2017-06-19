@@ -24,3 +24,5 @@ Seq.iter printResult <| plugin.ProcessQuery [ "pr"; "wox-launcher/wox" ]
 Seq.iter printResult <| plugin.ProcessQuery [ "repo"; "wox-launcher/wox" ]
 
 Seq.iter printResult <| plugin.ProcessQuery [ "search term" ]
+
+Seq.iter printResult <| plugin.ProcessQuery [ ]
