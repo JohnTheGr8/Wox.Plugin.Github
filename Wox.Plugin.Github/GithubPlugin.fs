@@ -26,8 +26,15 @@ type GithubPlugin() =
     let changeQuery (newQuery:string) (newParam:string) =
         PluginContext.API.ChangeQuery <| sprintf "%s %s %s" PluginContext.CurrentPluginMetadata.ActionKeyword newQuery newParam
         false
-    
-    let limitExceededResult = seq [ new Result(Title = "Rate limit exceeded", SubTitle = "please try again later", IcoPath = "icon.png" ) ]
+
+    let errorResult (e:exn) = 
+        match e.InnerException with
+        | :? RateLimitExceededException -> 
+            seq [ new Result(Title = "Rate limit exceeded", SubTitle = "please try again later", IcoPath = "icon.png" ) ]
+        | :? NotFoundException -> 
+            seq [ new Result(Title = "Search failed", SubTitle = "The repository could not be found", IcoPath = "icon.png") ]
+        | _ -> 
+            seq [ new Result(Title = "Search failed", SubTitle = e.Message, IcoPath = "icon.png") ]
 
     let getRepositories (r:string) = async {
         let task = client.Search.SearchRepo(new SearchRepositoriesRequest(r))
@@ -50,7 +57,7 @@ type GithubPlugin() =
     }
 
     member this.ProcessQuery x =
-        match x with
+        let queryResults = match x with
         | ["repos"; search] ->
             getRepositories search
             |> Async.Catch
@@ -65,7 +72,7 @@ type GithubPlugin() =
                             IcoPath = "icon.png",
                             Action = fun _ -> changeQuery "repo" r.FullName
                             ))
-                | Choice2Of2 _ -> limitExceededResult
+                | Choice2Of2 err -> errorResult err
         | ["users"; search] ->
             getUsers search
             |> Async.Catch
@@ -80,7 +87,7 @@ type GithubPlugin() =
                             IcoPath = "icon.png",
                             Action = fun _-> openUrl u.HtmlUrl
                         ))
-                | Choice2Of2 _ -> limitExceededResult
+                | Choice2Of2 err -> errorResult err
         | ["issues"; UserRepoFormat(u,r)] ->
             getIssues u r
             |> Async.Catch
@@ -96,7 +103,7 @@ type GithubPlugin() =
                             IcoPath = "icon.png",
                             Action = fun _-> openUrl (i.HtmlUrl.ToString())
                         ))
-                | Choice2Of2 _ -> limitExceededResult
+                | Choice2Of2 err -> errorResult err
         | ["pr"; UserRepoFormat(u,r)] ->
             getIssues u r
             |> Async.Catch
@@ -112,7 +119,7 @@ type GithubPlugin() =
                             IcoPath = "icon.png",
                             Action = fun _-> openUrl (i.HtmlUrl.ToString())
                         ))
-                | Choice2Of2 _ -> limitExceededResult
+                | Choice2Of2 err -> errorResult err
         | ["repo"; UserRepoFormat(u, r)] ->
             let repoResult = getRepo u r |> Async.Catch |> Async.RunSynchronously
             let issuesResult = getIssues u r |> Async.Catch |> Async.RunSynchronously
@@ -141,7 +148,7 @@ type GithubPlugin() =
                         Action = fun _ -> changeQuery "pr" res.FullName
                         );
                 ]
-            | _ -> limitExceededResult
+            | Choice2Of2 err, _ | _, Choice2Of2 err -> errorResult err
         | [search] ->
             seq [
                 new Result(
@@ -157,7 +164,7 @@ type GithubPlugin() =
                     Action = fun _ -> changeQuery "users" search
                     );
             ]
-        | _ -> 
+        | [] -> 
             seq [ 
                 new Result(
                     Title = "Search repositories",
@@ -172,6 +179,11 @@ type GithubPlugin() =
                     Action = fun _ -> changeQuery "users" ""
                     );
             ]
+
+        if Seq.isEmpty queryResults then
+            seq [ new Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
+        else
+            queryResults
 
     interface IPlugin with
         member this.Init (context:PluginInitContext) = 
