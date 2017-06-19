@@ -142,6 +142,21 @@ type GithubPlugin() =
                         );
                 ]
             | _ -> limitExceededResult
+        | [search] ->
+            seq [
+                new Result(
+                    Title = "Search repositories",
+                    SubTitle = sprintf "Search for repositories matching \"%s\"" search,
+                    IcoPath = "icon.png",
+                    Action = fun _ -> changeQuery "repos" search
+                    );
+                new Result(
+                    Title = "Search users",
+                    SubTitle = sprintf "Search for users matching \"%s\"" search,
+                    IcoPath = "icon.png",
+                    Action = fun _ -> changeQuery "users" search
+                    );
+            ]
         | _ -> 
             seq [ new Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
 
