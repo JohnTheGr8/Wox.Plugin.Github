@@ -4,7 +4,7 @@
   "Name": "Wox.Plugin.Github",
   "Description": "Wox plugin to search repos, browse issues and PRs",
   "Author": "Ioannis G. (@JohnTheGr8)",
-  "Version": "1.0.0",
+  "Version": "1.1.0",
   "Language": "csharp",
   "Website": "https://github.com/JohnTheGr8/Wox.Plugin.Github",
   "IcoPath": "icon.png",
