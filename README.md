@@ -7,7 +7,7 @@ Github plugin for the [Wox launcher](https://github.com/Wox-launcher/Wox)
 
 Search Github repositories, navigate repository issues and pull requests, directly from Wox.
 
-![image](http://i.imgur.com/ATkNPbs.gif)
+![demo gif](http://i.imgur.com/ZL14NKU.gif)
 
 ### Usage
 
