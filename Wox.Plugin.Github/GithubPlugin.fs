@@ -12,12 +12,11 @@ type GithubPlugin() =
 
     let mutable PluginContext = new PluginInitContext()
 
-    let (|UserRepoFormat|OtherFormat|) (name:string) =
+    let (|UserRepoFormat|_|) (name:string) =
         let m = Regex.Match(name, "^(?<user>(.+))(\/)(?<repo>(.+))$")
-        if m.Success then
-            let user,group = m.Groups.["user"].Value, m.Groups.["repo"].Value
-            UserRepoFormat(user, group)
-        else OtherFormat
+        if m.Success 
+        then Some (m.Groups.["user"].Value, m.Groups.["repo"].Value)
+        else None
 
     let openUrl (url:string) = 
         Process.Start url |> ignore
