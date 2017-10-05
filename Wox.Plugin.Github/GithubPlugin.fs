@@ -8,9 +8,9 @@ open System.Diagnostics
 
 type GithubPlugin() = 
     
-    let client = new GitHubClient(new ProductHeaderValue("Octokit"))
+    let client = GitHubClient(ProductHeaderValue("Octokit"))
 
-    let mutable PluginContext = new PluginInitContext()
+    let mutable PluginContext = PluginInitContext()
 
     let (|UserRepoFormat|_|) (name:string) =
         let m = Regex.Match(name, "^(?<user>(.+))(\/)(?<repo>(.+))$")
@@ -36,12 +36,12 @@ type GithubPlugin() =
             seq [ new Result(Title = "Search failed", SubTitle = e.Message, IcoPath = "icon.png") ]
 
     let getRepositories (r:string) = async {
-        let task = client.Search.SearchRepo(new SearchRepositoriesRequest(r))
+        let task = client.Search.SearchRepo(SearchRepositoriesRequest(r))
         return! Async.AwaitTask task
     }
     
     let getUsers (u:string) = async {
-        let task = client.Search.SearchUsers(new SearchUsersRequest(u))
+        let task = client.Search.SearchUsers(SearchUsersRequest(u))
         return! Async.AwaitTask task
     }
     
@@ -180,7 +180,7 @@ type GithubPlugin() =
             ]
 
         if Seq.isEmpty queryResults then
-            seq [ new Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
+            seq [ Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
         else
             queryResults
 

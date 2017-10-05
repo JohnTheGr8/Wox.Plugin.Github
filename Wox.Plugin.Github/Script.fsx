@@ -11,7 +11,7 @@ open Wox.Plugin.Github
 let printResult (r:Result) =
     printfn "Title: \t\t %s \nSubTitle: \t %s " r.Title r.SubTitle
 
-let plugin = new GithubPlugin()
+let plugin = GithubPlugin()
 
 // should return a list of repositories
 Seq.iter printResult <| plugin.ProcessQuery [ "repos"; "wox" ]
