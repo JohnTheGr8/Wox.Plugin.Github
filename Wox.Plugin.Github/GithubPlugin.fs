@@ -18,6 +18,8 @@ type GithubPlugin() =
         then Some (m.Groups.["user"].Value, m.Groups.["repo"].Value)
         else None
 
+    let isPullRequest (i:Issue) = not (isNull i.PullRequest)     
+
     let openUrl (url:string) = 
         Process.Start url |> ignore
         true
@@ -29,11 +31,11 @@ type GithubPlugin() =
     let errorResult (e:exn) = 
         match e.InnerException with
         | :? RateLimitExceededException -> 
-            seq [ new Result(Title = "Rate limit exceeded", SubTitle = "please try again later", IcoPath = "icon.png" ) ]
+            seq [ { title = "Rate limit exceeded"; subtitle = "please try again later"; action = fun _ -> false } ]
         | :? NotFoundException -> 
-            seq [ new Result(Title = "Search failed", SubTitle = "The repository could not be found", IcoPath = "icon.png") ]
+            seq [ { title = "Search failed"; subtitle = "The repository could not be found"; action = fun _ -> false } ]
         | _ -> 
-            seq [ new Result(Title = "Search failed", SubTitle = e.Message, IcoPath = "icon.png") ]
+            seq [ { title = "Search failed"; subtitle = e.Message; action = fun _ -> false } ]
 
     let getRepositories (r:string) = async {
         let task = client.Search.SearchRepo(SearchRepositoriesRequest(r))
@@ -55,134 +57,94 @@ type GithubPlugin() =
         return! Async.AwaitTask task
     }
 
-    member this.ProcessQuery x =
-        let queryResults = match x with
+    let getRepoInfo (u:string) (r:string) = async { 
+        let! repo = getRepo u r 
+        let! issues = getIssues u r
+        let issueCount, prCount = 
+            issues |> Seq.fold (fun (i,pr) x -> if isPullRequest x then (i,pr+1) else (i+1,pr)) (0, 0)
+        return repo, issueCount, prCount
+    }
+
+    let continueWith f = 
+        Async.Catch >> Async.RunSynchronously >> function
+        | Choice1Of2 result -> f result
+        | Choice2Of2 error  -> errorResult error
+
+    member this.ProcessQuery query =
+        let queryResults = match query with
         | ["repos"; search] ->
             getRepositories search
-            |> Async.Catch
-            |> Async.RunSynchronously
-            |> function
-                | Choice1Of2 result ->
-                    result.Items
-                    |> Seq.map (fun r -> 
-                        new Result(
-                            Title = r.FullName,
-                            SubTitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description,
-                            IcoPath = "icon.png",
-                            Action = fun _ -> changeQuery "repo" r.FullName
-                            ))
-                | Choice2Of2 err -> errorResult err
+            |> continueWith (fun result ->
+                result.Items
+                |> Seq.map (fun r -> 
+                    { title    = r.FullName
+                      subtitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description
+                      action   = fun _ -> changeQuery "repo" r.FullName } ))
+
         | ["users"; search] ->
             getUsers search
-            |> Async.Catch
-            |> Async.RunSynchronously
-            |> function
-                | Choice1Of2 result -> 
-                    result.Items
-                    |> Seq.map (fun u -> 
-                        new Result(
-                            Title = u.Login,
-                            SubTitle = u.HtmlUrl,
-                            IcoPath = "icon.png",
-                            Action = fun _-> openUrl u.HtmlUrl
-                        ))
-                | Choice2Of2 err -> errorResult err
+            |> continueWith (fun result ->
+                result.Items
+                |> Seq.map (fun u -> 
+                    { title    = u.Login
+                      subtitle = u.HtmlUrl
+                      action   = fun _ -> openUrl u.HtmlUrl } ))
+
         | ["issues"; UserRepoFormat(u,r)] ->
             getIssues u r
-            |> Async.Catch
-            |> Async.RunSynchronously
-            |> function
-                | Choice1Of2 result -> 
-                    result
-                    |> Seq.filter (fun i -> isNull i.PullRequest)
-                    |> Seq.map (fun i -> 
-                        new Result(
-                            Title = i.Title,
-                            SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
-                            IcoPath = "icon.png",
-                            Action = fun _-> openUrl (i.HtmlUrl.ToString())
-                        ))
-                | Choice2Of2 err -> errorResult err
+            |> continueWith (fun result ->
+                result
+                |> Seq.filter (isPullRequest >> not)
+                |> Seq.map (fun i -> 
+                    { title    = i.Title
+                      subtitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login)
+                      action   = fun _ -> openUrl (i.HtmlUrl.ToString()) } ))
+
         | ["pr"; UserRepoFormat(u,r)] ->
             getIssues u r
-            |> Async.Catch
-            |> Async.RunSynchronously
-            |> function
-                | Choice1Of2 result -> 
-                    result
-                    |> Seq.filter (fun i -> not (isNull i.PullRequest) )
-                    |> Seq.map (fun i -> 
-                        new Result(
-                            Title = i.Title,
-                            SubTitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login),
-                            IcoPath = "icon.png",
-                            Action = fun _-> openUrl (i.HtmlUrl.ToString())
-                        ))
-                | Choice2Of2 err -> errorResult err
+            |> continueWith (fun result ->
+                result
+                |> Seq.filter isPullRequest
+                |> Seq.map (fun i -> 
+                    { title    = i.Title
+                      subtitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login)
+                      action   = fun _ -> openUrl (i.HtmlUrl.ToString()) } ))
+
         | ["repo"; UserRepoFormat(u, r)] ->
-            let repoResult = getRepo u r |> Async.Catch |> Async.RunSynchronously
-            let issuesResult = getIssues u r |> Async.Catch |> Async.RunSynchronously
+            getRepoInfo u r 
+            |> continueWith (fun (res, issueCount, prCount) ->
+                seq [ 
+                    { title    = res.FullName
+                      subtitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description
+                      action   = fun _ -> openUrl res.HtmlUrl };
+                    { title    = "Issues"
+                      subtitle = (sprintf "%d issues open" issueCount)
+                      action   = fun _ -> changeQuery "issues" res.FullName };
+                    { title    = "Pull Requests"
+                      subtitle = (sprintf "%d pull requests open" prCount)
+                      action   = fun _ -> changeQuery "pr" res.FullName } ] )
 
-            match repoResult, issuesResult with
-            | Choice1Of2 res, Choice1Of2 issues ->
-                let issueCount,prCount = issues |> Seq.fold (fun (i,pr) x -> if isNull x.PullRequest then (i+1,pr) else (i,pr+1)) (0, 0)
+        | [search] -> 
+            seq [   { title    = "Search repositories"
+                      subtitle = sprintf "Search for repositories matching \"%s\"" search
+                      action   = fun _ -> changeQuery "repos" search };
+                    { title    = "Search users"
+                      subtitle = sprintf "Search for users matching \"%s\"" search
+                      action   = fun _ -> changeQuery "users" search } ]
 
-                seq [
-                    new Result(
-                        Title = res.FullName, 
-                        SubTitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description,
-                        IcoPath = "icon.png",
-                        Action = fun _-> openUrl res.HtmlUrl
-                        );
-                    new Result(
-                        Title = "Issues", 
-                        SubTitle = (sprintf "%d issues open" issueCount),
-                        IcoPath = "icon.png",
-                        Action = fun _ -> changeQuery "issues" res.FullName
-                        );
-                    new Result(
-                        Title = "Pull Requests", 
-                        SubTitle = (sprintf "%d pull requests open" prCount),
-                        IcoPath = "icon.png",
-                        Action = fun _ -> changeQuery "pr" res.FullName
-                        );
-                ]
-            | Choice2Of2 err, _ | _, Choice2Of2 err -> errorResult err
-        | [search] ->
-            seq [
-                new Result(
-                    Title = "Search repositories",
-                    SubTitle = sprintf "Search for repositories matching \"%s\"" search,
-                    IcoPath = "icon.png",
-                    Action = fun _ -> changeQuery "repos" search
-                    );
-                new Result(
-                    Title = "Search users",
-                    SubTitle = sprintf "Search for users matching \"%s\"" search,
-                    IcoPath = "icon.png",
-                    Action = fun _ -> changeQuery "users" search
-                    );
-            ]
         | [] -> 
-            seq [ 
-                new Result(
-                    Title = "Search repositories",
-                    SubTitle = "Search Github repositories with \"gh repos {repo-search-term}\"",
-                    IcoPath = "icon.png",
-                    Action = fun _ -> changeQuery "repos" ""
-                    );
-                new Result(
-                    Title = "Search users",
-                    SubTitle = "Search Github users with \"gh users {user-search-term}\"",
-                    IcoPath = "icon.png",
-                    Action = fun _ -> changeQuery "users" ""
-                    );
-            ]
+            seq [   { title    = "Search repositories"
+                      subtitle = "Search Github repositories with \"gh repos {repo-search-term}\""
+                      action   = fun _ -> changeQuery "repos" "" };
+                    { title    = "Search users"
+                      subtitle = "Search Github users with \"gh users {user-search-term}\""
+                      action   = fun _ -> changeQuery "users" "" } ]
 
         if Seq.isEmpty queryResults then
             seq [ Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
         else
-            queryResults
+            queryResults 
+            |> Seq.map (fun (r:SearchResult) -> Result(Title = r.title, SubTitle = r.subtitle, IcoPath = "icon.png", Action = fun x -> r.action x ))
 
     interface IPlugin with
         member this.Init (context:PluginInitContext) = 
@@ -193,3 +155,6 @@ type GithubPlugin() =
             
             this.ProcessQuery query
             |> List<Result>
+
+and 
+    SearchResult = { title : string ; subtitle : string; action : ActionContext -> bool }
