@@ -1,5 +1,0 @@
-source https://www.nuget.org/api/v2
-framework >= net452
-nuget System.ValueTuple 4.3.0
-nuget Wox.Plugin 1.3.159
-nuget Octokit 0.24.0
