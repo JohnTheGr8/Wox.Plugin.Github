@@ -1,160 +1,138 @@
-﻿namespace Wox.Plugin.Github
+namespace Wox.Plugin.Github
 
-open Octokit
 open Wox.Plugin
 open System.Collections.Generic
 open System.Text.RegularExpressions
 open System.Diagnostics
 
-type GithubPlugin() = 
-    
-    let client = GitHubClient(ProductHeaderValue("Octokit"))
+type ActionForQuery =
+    | RunApiSearch of Async<ApiSearchResult>
+    | SuggestQuery of QuerySuggestion
 
-    let mutable PluginContext = PluginInitContext()
+and QuerySuggestion =
+    | SearchRepos of string
+    | DefaultSuggestion
+
+type SearchResult = { title : string ; subtitle : string; action : ActionContext -> bool }
+
+type GithubPlugin() =
 
     let (|UserRepoFormat|_|) (name:string) =
         let m = Regex.Match(name, "^(?<user>(.+))(\/)(?<repo>(.+))$")
-        if m.Success 
+        if m.Success
         then Some (m.Groups.["user"].Value, m.Groups.["repo"].Value)
         else None
 
-    let isPullRequest (i:Issue) = not (isNull i.PullRequest)     
+    let parseQuery = function
+        | [ "repos"; search ]                      -> RunApiSearch (GithubApi.getRepositories search)
+        | [ "users"; search ]                      -> RunApiSearch (GithubApi.getUsers search)
+        | [ "issues"; UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoIssues user repo)
+        | [ "pr";     UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
+        | [ "pull";   UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
+        | [ "repo";   UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoInfo user repo)
+        | [ search ]                               -> SuggestQuery (SearchRepos search)
+        | _                                        -> SuggestQuery DefaultSuggestion
 
-    let openUrl (url:string) = 
+    let mutable pluginContext = PluginInitContext()
+
+    let openUrl (url:string) =
         Process.Start url |> ignore
         true
 
     let changeQuery (newQuery:string) (newParam:string) =
-        PluginContext.API.ChangeQuery <| sprintf "%s %s %s" PluginContext.CurrentPluginMetadata.ActionKeyword newQuery newParam
+        pluginContext.API.ChangeQuery <| sprintf "%s %s %s" pluginContext.CurrentPluginMetadata.ActionKeyword newQuery newParam
         false
 
-    let errorResult (e:exn) = 
+    /// ApiSearchResult -> SearchResult list
+    let presentApiSearchResult = function
+        | Repos [] | RepoIssues [] | RepoPRs [] | Users [] ->
+            [   { title    = "No results found"
+                  subtitle = "please try a different query"
+                  action   = fun _ -> false } ]
+        | Repos repos ->
+            [ for r in repos ->
+                { title    = r.FullName
+                  subtitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description
+                  action   = fun _ -> changeQuery "repo" r.FullName } ]
+        | RepoIssues issues ->
+            [ for i in issues ->
+                { title    = i.Title
+                  subtitle = sprintf "issue #%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login
+                  action   = fun _ -> openUrl (string i.HtmlUrl) } ]
+        | RepoPRs issues ->
+            [ for i in issues ->
+                { title    = i.Title
+                  subtitle = sprintf "PR #%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login
+                  action   = fun _ -> openUrl (string i.HtmlUrl) } ]
+        | Users users ->
+            [ for u in users ->
+                { title    = u.Login
+                  subtitle = u.HtmlUrl
+                  action   = fun _ -> openUrl (string u.HtmlUrl) } ]
+        | RepoDetails (res, issues, prs) ->
+            [   { title    = res.FullName
+                  subtitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description
+                  action   = fun _ -> openUrl res.HtmlUrl };
+                { title    = "Issues"
+                  subtitle = sprintf "%d issues open" (List.length issues)
+                  action   = fun _ -> changeQuery "issues" res.FullName };
+                { title    = "Pull Requests"
+                  subtitle = sprintf "%d pull requests open" (List.length prs)
+                  action   = fun _ -> changeQuery "pr" res.FullName } ]
+
+    /// QuerySuggestion -> SearchResult list
+    let presentSuggestion = function
+        | SearchRepos search ->
+            [   { title    = "Search repositories"
+                  subtitle = sprintf "Search for repositories matching \"%s\"" search
+                  action   = fun _ -> changeQuery "repos" search };
+                { title    = "Search users"
+                  subtitle = sprintf "Search for users matching \"%s\"" search
+                  action   = fun _ -> changeQuery "users" search } ]
+        | DefaultSuggestion ->
+            [   { title    = "Search repositories"
+                  subtitle = "Search Github repositories with \"gh repos {repo-search-term}\""
+                  action   = fun _ -> changeQuery "repos" "" };
+                { title    = "Search users"
+                  subtitle = "Search Github users with \"gh users {user-search-term}\""
+                  action   = fun _ -> changeQuery "users" "" } ]
+
+    /// exn -> SearchResult list
+    let presentApiSearchExn (e: exn) =
+        let defaultResult = { title = "Search failed"; subtitle = e.Message; action = fun _ -> false }
         match e.InnerException with
-        | :? RateLimitExceededException -> 
-            seq [ { title = "Rate limit exceeded"; subtitle = "please try again later"; action = fun _ -> false } ]
-        | :? NotFoundException -> 
-            seq [ { title = "Search failed"; subtitle = "The repository could not be found"; action = fun _ -> false } ]
-        | _ -> 
-            seq [ { title = "Search failed"; subtitle = e.Message; action = fun _ -> false } ]
+        | null ->
+            [ defaultResult ]
+        | :? Octokit.RateLimitExceededException ->
+            [ { defaultResult with
+                    title = "Rate limit exceeded"
+                    subtitle = "please try again later" } ]
+        | :? Octokit.NotFoundException ->
+            [ { defaultResult with
+                    subtitle = "The repository could not be found" } ]
+        | _ ->
+            [ defaultResult ]
 
-    let getRepositories (r:string) = async {
-        let task = client.Search.SearchRepo(SearchRepositoriesRequest(r))
-        return! Async.AwaitTask task
-    }
-    
-    let getUsers (u:string) = async {
-        let task = client.Search.SearchUsers(SearchUsersRequest(u))
-        return! Async.AwaitTask task
-    }
-    
-    let getIssues (u:string) (r:string) = async {
-        let task = client.Issue.GetAllForRepository(u, r)
-        return! Async.AwaitTask task
-    }
+    let tryRunApiSearch =
+           Async.Catch
+        >> Async.RunSynchronously
+        >> function
+            | Choice1Of2 result -> presentApiSearchResult result
+            | Choice2Of2 exn -> presentApiSearchExn exn
 
-    let getRepo (u:string) (r:string) = async {
-        let task = client.Repository.Get(u,r)
-        return! Async.AwaitTask task
-    }
-
-    let getRepoInfo (u:string) (r:string) = async { 
-        let! repo = getRepo u r 
-        let! issues = getIssues u r
-        let issueCount, prCount = 
-            issues |> Seq.fold (fun (i,pr) x -> if isPullRequest x then (i,pr+1) else (i+1,pr)) (0, 0)
-        return repo, issueCount, prCount
-    }
-
-    let continueWith f = 
-        Async.Catch >> Async.RunSynchronously >> function
-        | Choice1Of2 result -> f result
-        | Choice2Of2 error  -> errorResult error
-
-    member this.ProcessQuery query =
-        let queryResults = match query with
-        | ["repos"; search] ->
-            getRepositories search
-            |> continueWith (fun result ->
-                result.Items
-                |> Seq.map (fun r -> 
-                    { title    = r.FullName
-                      subtitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description
-                      action   = fun _ -> changeQuery "repo" r.FullName } ))
-
-        | ["users"; search] ->
-            getUsers search
-            |> continueWith (fun result ->
-                result.Items
-                |> Seq.map (fun u -> 
-                    { title    = u.Login
-                      subtitle = u.HtmlUrl
-                      action   = fun _ -> openUrl u.HtmlUrl } ))
-
-        | ["issues"; UserRepoFormat(u,r)] ->
-            getIssues u r
-            |> continueWith (fun result ->
-                result
-                |> Seq.filter (isPullRequest >> not)
-                |> Seq.map (fun i -> 
-                    { title    = i.Title
-                      subtitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login)
-                      action   = fun _ -> openUrl (i.HtmlUrl.ToString()) } ))
-
-        | ["pr"; UserRepoFormat(u,r)] ->
-            getIssues u r
-            |> continueWith (fun result ->
-                result
-                |> Seq.filter isPullRequest
-                |> Seq.map (fun i -> 
-                    { title    = i.Title
-                      subtitle = (sprintf "#%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login)
-                      action   = fun _ -> openUrl (i.HtmlUrl.ToString()) } ))
-
-        | ["repo"; UserRepoFormat(u, r)] ->
-            getRepoInfo u r 
-            |> continueWith (fun (res, issueCount, prCount) ->
-                seq [ 
-                    { title    = res.FullName
-                      subtitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description
-                      action   = fun _ -> openUrl res.HtmlUrl };
-                    { title    = "Issues"
-                      subtitle = (sprintf "%d issues open" issueCount)
-                      action   = fun _ -> changeQuery "issues" res.FullName };
-                    { title    = "Pull Requests"
-                      subtitle = (sprintf "%d pull requests open" prCount)
-                      action   = fun _ -> changeQuery "pr" res.FullName } ] )
-
-        | [search] -> 
-            seq [   { title    = "Search repositories"
-                      subtitle = sprintf "Search for repositories matching \"%s\"" search
-                      action   = fun _ -> changeQuery "repos" search };
-                    { title    = "Search users"
-                      subtitle = sprintf "Search for users matching \"%s\"" search
-                      action   = fun _ -> changeQuery "users" search } ]
-
-        | [] -> 
-            seq [   { title    = "Search repositories"
-                      subtitle = "Search Github repositories with \"gh repos {repo-search-term}\""
-                      action   = fun _ -> changeQuery "repos" "" };
-                    { title    = "Search users"
-                      subtitle = "Search Github users with \"gh users {user-search-term}\""
-                      action   = fun _ -> changeQuery "users" "" } ]
-
-        if Seq.isEmpty queryResults then
-            seq [ Result(Title = "No results found", SubTitle = "please try a different query", IcoPath = "icon.png") ]
-        else
-            queryResults 
-            |> Seq.map (fun (r:SearchResult) -> Result(Title = r.title, SubTitle = r.subtitle, IcoPath = "icon.png", Action = fun x -> r.action x ))
+    member this.ProcessQuery terms =
+        match parseQuery terms with
+        | RunApiSearch fSearch -> tryRunApiSearch fSearch
+        | SuggestQuery suggestion -> presentSuggestion suggestion
 
     interface IPlugin with
-        member this.Init (context:PluginInitContext) = 
-            PluginContext <- context
+        member this.Init (context:PluginInitContext) =
+            pluginContext <- context
 
-        member this.Query (q:Query) =
-            let query = List.ofArray q.Terms |> List.skip 1
-            
-            this.ProcessQuery query
+        member this.Query (query:Query) =
+            query.Terms
+            |> List.ofArray
+            |> List.skip 1
+            |> this.ProcessQuery
+            |> List.map (fun r -> Result( Title = r.title, SubTitle = r.subtitle, IcoPath = "icon.png", Action = fun x -> r.action x ))
             |> List<Result>
-
-and 
-    SearchResult = { title : string ; subtitle : string; action : ActionContext -> bool }
