@@ -4,6 +4,7 @@ open Wox.Plugin
 open System.Collections.Generic
 open System.Text.RegularExpressions
 open System.Diagnostics
+open Humanizer
 
 type ActionForQuery =
     | RunApiSearch of Async<ApiSearchResult>
@@ -57,12 +58,12 @@ type GithubPlugin() =
         | RepoIssues issues ->
             [ for i in issues ->
                 { title    = i.Title
-                  subtitle = sprintf "issue #%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login
+                  subtitle = sprintf "issue #%d | created %s by %s" i.Number (i.CreatedAt.Humanize()) i.User.Login
                   action   = fun _ -> openUrl (string i.HtmlUrl) } ]
         | RepoPRs issues ->
             [ for i in issues ->
                 { title    = i.Title
-                  subtitle = sprintf "PR #%d | opened %s by %s" i.Number (i.CreatedAt.ToString("dd/mm/yy")) i.User.Login
+                  subtitle = sprintf "PR #%d | created %s by %s" i.Number (i.CreatedAt.Humanize()) i.User.Login
                   action   = fun _ -> openUrl (string i.HtmlUrl) } ]
         | Users users ->
             [ for u in users ->
