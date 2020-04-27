@@ -54,7 +54,10 @@ type GithubPlugin() =
             [ for r in repos ->
                 { title    = r.FullName
                   subtitle = sprintf "(★%d | %s) %s" r.StargazersCount r.Language r.Description
-                  action   = fun _ -> changeQuery "repo" r.FullName } ]
+                  action   = fun ctx ->
+                                if ctx.SpecialKeyState.CtrlPressed
+                                then openUrl r.HtmlUrl
+                                else changeQuery "repo" r.FullName } ]
         | RepoIssues issues ->
             [ for i in issues ->
                 { title    = i.Title
@@ -80,10 +83,16 @@ type GithubPlugin() =
                   action   = fun _ -> openUrl res.HtmlUrl };
                 { title    = "Issues"
                   subtitle = sprintf "%d issues open" (List.length issues)
-                  action   = fun _ -> changeQuery "issues" res.FullName };
+                  action   = fun ctx ->
+                                if ctx.SpecialKeyState.CtrlPressed
+                                then openUrl (res.HtmlUrl + "/issues")
+                                else changeQuery "issues" res.FullName };
                 { title    = "Pull Requests"
                   subtitle = sprintf "%d pull requests open" (List.length prs)
-                  action   = fun _ -> changeQuery "pr" res.FullName } ]
+                  action   = fun ctx ->
+                                if ctx.SpecialKeyState.CtrlPressed
+                                then openUrl (res.HtmlUrl + "/pulls")
+                                else changeQuery "pr" res.FullName } ]
 
     /// QuerySuggestion -> SearchResult list
     let presentSuggestion = function
