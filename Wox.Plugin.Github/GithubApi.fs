@@ -2,6 +2,14 @@ namespace Wox.Plugin.Github
 
 open Octokit
 
+type ApiSearchRequest =
+    | FindRepos of string
+    | FindUsers of string
+    | FindIssues of string * string
+    | FindPRs of string * string
+    | FindIssue of string * string * int
+    | FindRepo of string * string
+
 type ApiSearchResult =
     | Repos of Repository list
     | RepoIssues of Issue list
@@ -62,3 +70,13 @@ module GithubApi =
         let! data = client.Issue.Get(user, repo, issue) |> Async.AwaitTask
         return RepoIssue data
     }
+
+module Gh =
+
+    let runSearch = function
+        | FindRepos search              -> GithubApi.getRepositories search
+        | FindUsers search              -> GithubApi.getUsers search
+        | FindIssues (user, repo)       -> GithubApi.getRepoIssues user repo
+        | FindPRs (user, repo)          -> GithubApi.getRepoPRs user repo
+        | FindIssue (user, repo, issue) -> GithubApi.getSpecificIssue user repo issue
+        | FindRepo (user, repo)         -> GithubApi.getRepoInfo user repo

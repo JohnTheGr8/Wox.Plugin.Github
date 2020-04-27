@@ -1,4 +1,4 @@
-﻿namespace Wox.Plugin.Github
+namespace Wox.Plugin.Github
 
 open Wox.Plugin
 open System.Collections.Generic
@@ -17,21 +17,22 @@ type SearchResult = { title : string ; subtitle : string; action : ActionContext
 
 type GithubPlugin() =
 
+    let runApiSearch = Gh.runSearch >> RunApiSearch
+
     let parseQuery = function
-        | [ "repos"; search ]                      -> RunApiSearch (GithubApi.getRepositories search)
-        | [ "users"; search ]                      -> RunApiSearch (GithubApi.getUsers search)
-        | [ "issues"; UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoIssues user repo)
-        | [ "pr";     UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
-        | [ "pull";   UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
-        | [ "repo";   UserRepoFormat (user,repo) ] -> RunApiSearch (GithubApi.getRepoInfo user repo)
-        | [ UserRepoFormat (user, repo)          ] -> RunApiSearch (GithubApi.getRepoInfo user repo)
-        | [ UserRepoFormat (user,repo); "issues" ] -> RunApiSearch (GithubApi.getRepoIssues user repo)
-        | [ UserRepoFormat (user,repo); "pr"     ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
-        | [ UserRepoFormat (user,repo); "pull"   ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
-        | [ UserRepoFormat (user,repo); "repo"   ] -> RunApiSearch (GithubApi.getRepoInfo user repo)
-        | [ UserRepoFormat (u,r); IssueFormat i  ] -> RunApiSearch (GithubApi.getSpecificIssue u r i)
-        | [ search ]                               -> SuggestQuery (SearchRepos search)
-        | _                                        -> SuggestQuery DefaultSuggestion
+        | [ "repos"; search ]                     -> runApiSearch (FindRepos search)
+        | [ "users"; search ]                     -> runApiSearch (FindUsers search)
+        | [ "issues"; UserRepoFormat search ]     -> runApiSearch (FindIssues search)
+        | [ "pr";     UserRepoFormat search ]     -> runApiSearch (FindPRs search)
+        | [ "pull";   UserRepoFormat search ]     -> runApiSearch (FindPRs search)
+        | [ "repo";   UserRepoFormat search ]     -> runApiSearch (FindRepo search)
+        | [ UserRepoFormat search           ]     -> runApiSearch (FindRepo search)
+        | [ UserRepoFormat search; "issues" ]     -> runApiSearch (FindIssues search)
+        | [ UserRepoFormat search; "pr"     ]     -> runApiSearch (FindPRs search)
+        | [ UserRepoFormat search; "pull"   ]     -> runApiSearch (FindPRs search)
+        | [ UserRepoFormat (u,r); IssueFormat i ] -> runApiSearch (FindIssue (u,r,i))
+        | [ search ]                              -> SuggestQuery (SearchRepos search)
+        | _                                       -> SuggestQuery DefaultSuggestion
 
     let mutable pluginContext = PluginInitContext()
 
