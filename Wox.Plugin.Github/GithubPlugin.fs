@@ -2,7 +2,6 @@
 
 open Wox.Plugin
 open System.Collections.Generic
-open System.Text.RegularExpressions
 open System.Diagnostics
 open Humanizer
 
@@ -17,19 +16,6 @@ and QuerySuggestion =
 type SearchResult = { title : string ; subtitle : string; action : ActionContext -> bool }
 
 type GithubPlugin() =
-
-    let (|UserRepoFormat|_|) (name:string) =
-        let m = Regex.Match(name, "^(?<user>(.+))(\/)(?<repo>(.+))$")
-        if m.Success
-        then Some (m.Groups.["user"].Value, m.Groups.["repo"].Value)
-        else None
-
-    let (|IssueFormat|_|) (value: string) =
-        if value.StartsWith "#" && value.Length > 1 then
-            match System.Int32.TryParse (value.Substring 1) with
-            | true, x when x > 0 -> Some x
-            | _ -> None
-        else None
 
     let parseQuery = function
         | [ "repos"; search ]                      -> RunApiSearch (GithubApi.getRepositories search)
@@ -72,21 +58,21 @@ type GithubPlugin() =
             [ for i in issues ->
                 { title    = i.Title
                   subtitle = sprintf "issue #%d | created %s by %s" i.Number (i.CreatedAt.Humanize()) i.User.Login
-                  action   = fun _ -> openUrl (string i.HtmlUrl) } ]
+                  action   = fun _ -> openUrl i.HtmlUrl } ]
         | RepoIssue issue ->
             [   { title    = sprintf "#%d - %s" issue.Number issue.Title
                   subtitle = sprintf "%A | created by %s | last updated %s" issue.State issue.User.Login (issue.UpdatedAt.Humanize())
-                  action   = fun _ -> openUrl (string issue.HtmlUrl) } ]
+                  action   = fun _ -> openUrl issue.HtmlUrl } ]
         | RepoPRs issues ->
             [ for i in issues ->
                 { title    = i.Title
                   subtitle = sprintf "PR #%d | created %s by %s" i.Number (i.CreatedAt.Humanize()) i.User.Login
-                  action   = fun _ -> openUrl (string i.HtmlUrl) } ]
+                  action   = fun _ -> openUrl i.HtmlUrl } ]
         | Users users ->
             [ for u in users ->
                 { title    = u.Login
                   subtitle = u.HtmlUrl
-                  action   = fun _ -> openUrl (string u.HtmlUrl) } ]
+                  action   = fun _ -> openUrl u.HtmlUrl } ]
         | RepoDetails (res, issues, prs) ->
             [   { title    = res.FullName
                   subtitle = sprintf "(★%d | %s) %s" res.StargazersCount res.Language res.Description
