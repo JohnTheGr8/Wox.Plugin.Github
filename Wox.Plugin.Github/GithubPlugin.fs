@@ -17,7 +17,7 @@ type SearchResult = { title : string ; subtitle : string; action : ActionContext
 
 type GithubPlugin() =
 
-    let runApiSearch = Gh.runSearch >> RunApiSearch
+    let runApiSearch = Gh.runSearchCached >> RunApiSearch
 
     let parseQuery = function
         | [ "repos"; search ]                     -> runApiSearch (FindRepos search)

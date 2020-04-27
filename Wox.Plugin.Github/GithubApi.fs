@@ -18,6 +18,31 @@ type ApiSearchResult =
     | Users of User list
     | RepoDetails of Repository * Issue list * Issue list
 
+module Cache =
+    open System
+    open System.Collections.Concurrent
+
+    let private resultCache =
+        ConcurrentDictionary<ApiSearchRequest, ApiSearchResult * DateTime>()
+
+    let private cacheAge = TimeSpan.FromHours 2.0
+
+    let private addToCache (key, value) =
+        let valueWithAge = (value, DateTime.Now.Add cacheAge)
+        resultCache.TryAdd (key, valueWithAge) |> ignore
+
+    let memoize fCompute key = async {
+        match resultCache.TryGetValue key with
+        | true, (res,exp) when exp > DateTime.Now ->
+            return res
+        | _ ->
+            let! result = fCompute key
+
+            addToCache (key, result)
+
+            return result
+    }
+
 module GithubApi =
 
     let private getClient () = 
@@ -80,3 +105,6 @@ module Gh =
         | FindPRs (user, repo)          -> GithubApi.getRepoPRs user repo
         | FindIssue (user, repo, issue) -> GithubApi.getSpecificIssue user repo issue
         | FindRepo (user, repo)         -> GithubApi.getRepoInfo user repo
+
+    let runSearchCached search =
+        Cache.memoize runSearch search
