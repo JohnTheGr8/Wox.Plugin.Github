@@ -1,4 +1,4 @@
-Wox.Plugin.Github
+Wox.Plugin.Github [![Build status](https://ci.appveyor.com/api/projects/status/pfq56cm1rcui0crp?svg=true)](https://ci.appveyor.com/project/JohnTheGr8/wox-plugin-github)
 ==================
 
 Github plugin for the [Wox launcher](https://github.com/Wox-launcher/Wox)
@@ -24,4 +24,6 @@ Search for users: `` gh users {user-search-term} ``
 ### Credits
 
 - [octokit.net](https://github.com/octokit/octokit.net) : A GitHub API client library for .NET
+- [expecto](https://github.com/haf/expecto) : testing library
+- [humanizer](https://github.com/Humanizr/Humanizer) : Library used to turn date-times into a relative format
 - [Github Icon](https://www.iconfinder.com/icons/291716/github_logo_social_social_network_icon) : Icon used
