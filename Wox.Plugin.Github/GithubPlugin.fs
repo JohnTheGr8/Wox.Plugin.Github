@@ -1,4 +1,4 @@
-namespace Wox.Plugin.Github
+﻿namespace Wox.Plugin.Github
 
 open Wox.Plugin
 open System.Collections.Generic
@@ -24,6 +24,13 @@ type GithubPlugin() =
         then Some (m.Groups.["user"].Value, m.Groups.["repo"].Value)
         else None
 
+    let (|IssueFormat|_|) (value: string) =
+        if value.StartsWith "#" && value.Length > 1 then
+            match System.Int32.TryParse (value.Substring 1) with
+            | true, x when x > 0 -> Some x
+            | _ -> None
+        else None
+
     let parseQuery = function
         | [ "repos"; search ]                      -> RunApiSearch (GithubApi.getRepositories search)
         | [ "users"; search ]                      -> RunApiSearch (GithubApi.getUsers search)
@@ -36,6 +43,7 @@ type GithubPlugin() =
         | [ UserRepoFormat (user,repo); "pr"     ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
         | [ UserRepoFormat (user,repo); "pull"   ] -> RunApiSearch (GithubApi.getRepoPRs user repo)
         | [ UserRepoFormat (user,repo); "repo"   ] -> RunApiSearch (GithubApi.getRepoInfo user repo)
+        | [ UserRepoFormat (u,r); IssueFormat i  ] -> RunApiSearch (GithubApi.getSpecificIssue u r i)
         | [ search ]                               -> SuggestQuery (SearchRepos search)
         | _                                        -> SuggestQuery DefaultSuggestion
 
@@ -65,6 +73,10 @@ type GithubPlugin() =
                 { title    = i.Title
                   subtitle = sprintf "issue #%d | created %s by %s" i.Number (i.CreatedAt.Humanize()) i.User.Login
                   action   = fun _ -> openUrl (string i.HtmlUrl) } ]
+        | RepoIssue issue ->
+            [   { title    = sprintf "#%d - %s" issue.Number issue.Title
+                  subtitle = sprintf "%A | created by %s | last updated %s" issue.State issue.User.Login (issue.UpdatedAt.Humanize())
+                  action   = fun _ -> openUrl (string issue.HtmlUrl) } ]
         | RepoPRs issues ->
             [ for i in issues ->
                 { title    = i.Title

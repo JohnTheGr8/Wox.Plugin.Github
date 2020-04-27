@@ -17,9 +17,11 @@ Display repository info: `` gh repo {full-repo-name} ``
 
 List repository issues: `` gh issues {full-repo-name} ``
 
-List repository pull requests: `` sp pr {full-repo-name} ``
+List repository pull requests: `` gh pr {full-repo-name} ``
 
 Search for users: `` gh users {user-search-term} ``
+
+Find specific issue or pull request: `` gh {full-repo-name} #123 ``
 
 ### Credits
 

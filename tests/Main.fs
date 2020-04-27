@@ -50,6 +50,17 @@ let allTests =
                 result.subtitle |> Expect.stringStarts "subtitle should start with" "PR #"
         }
 
+        test "single repo issue format" {
+            // should return a single issue
+            let result = 
+                plugin.ProcessQuery [ "wox-launcher/wox"; "#977" ]
+                |> List.tryExactlyOne
+                |> Expect.wantSome "there should be one result"
+            
+            result.title |> Expect.equal "title should match" "#977 - Highlighting how results matched"
+            result.subtitle |> Expect.stringStarts "subtitle should start with" "closed | created by JohnTheGr8 | last updated"
+        }
+
         test "repo details format" {
             // should return stats/issues/PRs
             let results = plugin.ProcessQuery [ "repo"; "wox-launcher/wox" ]

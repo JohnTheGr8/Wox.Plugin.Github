@@ -5,6 +5,7 @@ open Octokit
 type ApiSearchResult =
     | Repos of Repository list
     | RepoIssues of Issue list
+    | RepoIssue of Issue
     | RepoPRs of PullRequest list
     | Users of User list
     | RepoDetails of Repository * Issue list * Issue list
@@ -47,4 +48,9 @@ module GithubApi =
         let issues, prs = issuesAndPRs |> List.partition isNotPullRequest
 
         return RepoDetails (repository, issues, prs)
+    }
+
+    let getSpecificIssue (user: string) (repo: string) (issue: int) = async {
+        let! data = client.Issue.Get(user, repo, issue) |> Async.AwaitTask
+        return RepoIssue data
     }
