@@ -2,6 +2,7 @@
 module Wox.Plugin.Github.Helpers
 
 open System
+open System.IO
 open System.Text.RegularExpressions
 
 let (|UserRepoFormat|_|) (name:string) =
@@ -16,3 +17,15 @@ let (|IssueFormat|_|) (value: string) =
         | true, x when x > 0 -> Some x
         | _ -> None
     else None
+
+let tryEnvVar var =
+    match Environment.GetEnvironmentVariable var with
+    | null -> None
+    | value -> Some value
+
+let tryReadFile path = 
+    if File.Exists path then File.ReadAllText path |> Some else None
+
+let tryLoadGithubToken () = 
+    tryEnvVar "GITHUB_API_TOKEN"
+    |> Option.orElse (tryReadFile "github_token.txt")

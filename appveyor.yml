@@ -5,6 +5,9 @@ environment:
     DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
     DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
+    GITHUB_API_TOKEN:
+        secure: A6oZzdRaFi7zWLB8d5/gDfxtzn4Zh71cmGgmgA+FNySDrrZiLUJYcc+lclUa3F2y
+
 build_script:
 - ps: >-
     dotnet --info

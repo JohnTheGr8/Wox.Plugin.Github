@@ -12,8 +12,16 @@ type ApiSearchResult =
 
 module GithubApi =
 
+    let private getClient () = 
+        let productHeader = 
+            ProductHeaderValue "Wox.Plugin.Github"
+
+        match tryLoadGithubToken () with
+        | Some token -> GitHubClient(productHeader, Credentials = Credentials token)
+        | None -> GitHubClient productHeader
+
     let private client =
-        GitHubClient(ProductHeaderValue "Wox.Plugin.Github")
+        getClient ()
 
     let getRepositories (search: string) = async {
         let! results = client.Search.SearchRepo (SearchRepositoriesRequest search) |> Async.AwaitTask
