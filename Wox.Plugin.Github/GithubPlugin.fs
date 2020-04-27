@@ -31,6 +31,7 @@ type GithubPlugin() =
         | [ UserRepoFormat search; "pr"     ]     -> runApiSearch (FindPRs search)
         | [ UserRepoFormat search; "pull"   ]     -> runApiSearch (FindPRs search)
         | [ UserRepoFormat (u,r); IssueFormat i ] -> runApiSearch (FindIssue (u,r,i))
+        | [ UserReposFormat user ]                -> runApiSearch (FindUserRepos user)
         | [ search ]                              -> SuggestQuery (SearchRepos search)
         | _                                       -> SuggestQuery DefaultSuggestion
 

@@ -23,6 +23,8 @@ Search for users: `` gh users {user-search-term} ``
 
 Find specific issue or pull request: `` gh {full-repo-name} #123 ``
 
+List repositories by user: `` gh {owner-name}/ ``
+
 ### Credits
 
 - [octokit.net](https://github.com/octokit/octokit.net) : A GitHub API client library for .NET

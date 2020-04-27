@@ -1,4 +1,4 @@
-﻿module Wox.Plugin.Bang.Tests
+module Wox.Plugin.Bang.Tests
 
 open Expecto
 open Expecto.Flip
@@ -34,6 +34,15 @@ let allTests =
         test "user search" {
             // should return a list of users
             plugin.ProcessQuery [ "users"; "john" ] |> Expect.isNonEmpty "should not be empty"
+        }
+
+        test "user repo search" {
+            // should return a list of repositories owned by wox-launcher
+            let results = plugin.ProcessQuery [ "wox-launcher/" ] 
+            results |> Expect.isNonEmpty "should not be empty"
+
+            for result in results do
+                result.title |> Expect.stringStarts "title should start with" "Wox-launcher/"
         }
 
         test "repo issues format" {

@@ -9,6 +9,7 @@ type ApiSearchRequest =
     | FindPRs of string * string
     | FindIssue of string * string * int
     | FindRepo of string * string
+    | FindUserRepos of string
 
 type ApiSearchResult =
     | Repos of Repository list
@@ -66,6 +67,11 @@ module GithubApi =
         return List.ofSeq results.Items |> Users
     }
 
+    let getUserRepos (owner: string) = async {
+        let! results = client.Repository.GetAllForUser owner |> Async.AwaitTask
+        return List.ofSeq results |> List.sortByDescending (fun repo -> repo.UpdatedAt) |> Repos
+    }
+
     let getIssuesAndPRs (user: string) (repo: string) = async {
         let! results = client.Issue.GetAllForRepository(user, repo) |> Async.AwaitTask
         return List.ofSeq results
@@ -105,6 +111,7 @@ module Gh =
         | FindPRs (user, repo)          -> GithubApi.getRepoPRs user repo
         | FindIssue (user, repo, issue) -> GithubApi.getSpecificIssue user repo issue
         | FindRepo (user, repo)         -> GithubApi.getRepoInfo user repo
+        | FindUserRepos user            -> GithubApi.getUserRepos user
 
     let runSearchCached search =
         Cache.memoize runSearch search

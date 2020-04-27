@@ -18,6 +18,12 @@ let (|IssueFormat|_|) (value: string) =
         | _ -> None
     else None
 
+let (|UserReposFormat|_|) (value: string) = 
+    if value.EndsWith "/" && value.Length > 1 then
+        value.Substring (0, value.Length - 1) |> Some
+    else
+        None
+
 let tryEnvVar var =
     match Environment.GetEnvironmentVariable var with
     | null -> None
