@@ -142,6 +142,7 @@ type GithubPlugin() =
 
     interface IPlugin with
         member this.Init (context:PluginInitContext) =
+            Helpers.githubTokenFileDir <- context.CurrentPluginMetadata.PluginDirectory
             pluginContext <- context
 
         member this.Query (query:Query) =

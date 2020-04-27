@@ -31,7 +31,10 @@ let tryEnvVar var =
     | null -> None
     | value -> Some value
 
-let tryReadFile path = 
+let mutable githubTokenFileDir = __SOURCE_DIRECTORY__
+
+let tryReadFile fileName =
+    let path = Path.Combine(githubTokenFileDir, fileName)
     if File.Exists path then File.ReadAllText path |> Some else None
 
 let tryLoadGithubToken () = 
