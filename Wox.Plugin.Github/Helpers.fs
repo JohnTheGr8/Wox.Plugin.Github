@@ -24,6 +24,8 @@ let (|UserReposFormat|_|) (value: string) =
     else
         None
 
+let toLower (s: string) = s.ToLower()
+
 let tryEnvVar var =
     match Environment.GetEnvironmentVariable var with
     | null -> None

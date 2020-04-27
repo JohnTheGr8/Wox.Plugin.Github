@@ -28,9 +28,19 @@ module Cache =
 
     let private cacheAge = TimeSpan.FromHours 2.0
 
+    /// convert inner key values to lower-case
+    let private getActualKey = function
+        | FindRepos s -> FindRepos (toLower s)
+        | FindUsers s -> FindUsers (toLower s)
+        | FindIssues (u,r) -> FindIssues (toLower u, toLower r)
+        | FindPRs (u,r) -> FindPRs (toLower u, toLower r)
+        | FindIssue (u,r, i) -> FindIssue (toLower u, toLower r, i)
+        | FindRepo (u,r) -> FindRepo (toLower u, toLower r)
+        | FindUserRepos s -> FindUserRepos (toLower s)
+
     let private addToCache (key, value) =
         let valueWithAge = (value, DateTime.Now.Add cacheAge)
-        resultCache.TryAdd (key, valueWithAge) |> ignore
+        resultCache.TryAdd (getActualKey key, valueWithAge) |> ignore
 
     let memoize fCompute key = async {
         match resultCache.TryGetValue key with
@@ -40,6 +50,23 @@ module Cache =
             let! result = fCompute key
 
             addToCache (key, result)
+
+            match key, result with
+            | FindRepo(u,r), RepoDetails(_,issues,prs) ->
+                // cache repo issues
+                addToCache (FindIssues(u,r), RepoIssues issues)
+                // cache every issue by number
+                for issue in issues @ prs do
+                    addToCache (FindIssue (u,r,issue.Number), RepoIssue issue)
+                // cache every PR by number
+                let pullRequests = prs |> List.map (fun issue -> issue.PullRequest)
+                addToCache (FindPRs (u,r), RepoPRs pullRequests)
+            | FindIssues(u,r), RepoIssues issues ->
+                // cache every issue by number
+                for issue in issues do
+                    addToCache (FindIssue (u,r,issue.Number), RepoIssue issue)
+            | _ ->
+                ()
 
             return result
     }
