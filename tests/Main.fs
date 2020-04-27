@@ -1,4 +1,4 @@
-module Wox.Plugin.Bang.Tests
+﻿module Wox.Plugin.Bang.Tests
 
 open Expecto
 open Expecto.Flip
@@ -58,6 +58,16 @@ let allTests =
             results.[0].subtitle |> Expect.isNotEmpty "result 1 subtitle should not be empty"
             results.[1].subtitle |> Expect.stringEnds "result 2 subtitle should end with" "issues open"
             results.[2].subtitle |> Expect.stringEnds "result 2 subtitle should end with" "pull requests open"
+        }
+
+        test "repo details alt format" {
+            // should return stats/issues/PRs
+            let results1 = plugin.ProcessQuery [ "wox-launcher/wox" ]
+            let results2 = plugin.ProcessQuery [ "repo"; "wox-launcher/wox" ]
+
+            for result1, result2 in List.zip results1 results2 do
+                (result1.title, result2.title)       ||> Expect.equal "titles should be equal"
+                (result1.subtitle, result2.subtitle) ||> Expect.equal "subtitles should be equal"
         }
 
         testList "bad searches" [
