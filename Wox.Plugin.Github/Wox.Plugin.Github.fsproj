@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
@@ -6,9 +6,9 @@
     <PackageId>Wox.Plugin.Github</PackageId>
     <Authors>Ioannis G. (@JohnTheGr8)</Authors>
     <PackageProjectUrl>https://github.com/JohnTheGr8/Wox.Plugin.Github</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/PluginAuthor/Wox.Plugin.Github</RepositoryUrl>
+    <RepositoryUrl>https://github.com/JohnTheGr8/Wox.Plugin.Github</RepositoryUrl>
     <PackageTags>wox wox-plugin</PackageTags>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Helpers.fs" />
