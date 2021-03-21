@@ -20,10 +20,10 @@ build_script:
 
 after_build:
 - ps: >-
-    Compress-Archive -Path "Wox.Plugin.Github\bin\Release\net462\*" -DestinationPath "plugin.zip"
+    Compress-Archive -Path "src\bin\Release\net462\*" -DestinationPath "plugin.zip"
 
     Rename-Item plugin.zip Wox.Plugin.Github.wox
 
 artifacts:
-    - path: 'Wox.Plugin.Github\bin\Release\*.nupkg'
+    - path: 'src\bin\Release\*.nupkg'
     - path: '*.wox'

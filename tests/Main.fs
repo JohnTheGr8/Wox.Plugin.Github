@@ -1,4 +1,4 @@
-module Wox.Plugin.Bang.Tests
+module Wox.Plugin.Github.Tests
 
 open Expecto
 open Expecto.Flip
