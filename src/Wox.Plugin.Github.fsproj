@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
@@ -9,6 +9,9 @@
     <RepositoryUrl>https://github.com/JohnTheGr8/Wox.Plugin.Github</RepositoryUrl>
     <PackageTags>wox wox-plugin</PackageTags>
     <Version>1.2.0</Version>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Helpers.fs" />
